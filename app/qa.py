@@ -19,20 +19,20 @@ def get_answer(questions: list[str], document_url: str):
     all_answers = []
     for question in questions:
         try:
-            context_chunks = query_pinecone(question)
-            context = "\n".join(context_chunks)
+            context_chunks = query_pinecone(question, top_k=3)
+            context = "\n".join(context_chunks)[:3000]  # truncate for LLM if needed
             
-            prompt = f"""You are an expert insurance and legal document analyst. Answer the question based on the provided context from insurance policy documents.
+            prompt = f"""You are an expert insurance policy analyst. Answer the following user question using ONLY the relevant information from the provided insurance policy context.
 
 Context: {context}
 
 Question: {question}
 
 Instructions:
-- Provide a clear, accurate answer based on the context
-- If the information is not available in the context, state "I don't know" or "Information not available in the provided documents"
-- Be specific about policy terms, waiting periods, coverage limits, and conditions
-- Use exact terminology from the policy documents when possible
+- Only answer what is asked.
+- If answer is not in context, say "Information not available in the document."
+- Avoid unnecessary details or extra policy info.
+- Keep it short and to the point.
 
 Answer:"""
 
@@ -51,4 +51,4 @@ Answer:"""
             print(f"Error processing question '{question}': {e}")
             all_answers.append({"question": question, "answer": "Error processing this question. Please try again."})
 
-    return all_answers
+    return { "answers": all_answers }
