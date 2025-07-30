@@ -2,7 +2,6 @@ from fastapi import FastAPI, Depends, Header, HTTPException
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.middleware.cors import CORSMiddleware
 from app.qa import get_answer
-from app.ingest import process_and_store_pdf
 from app.models import QARequest
 import os
 
@@ -24,7 +23,7 @@ app.add_middleware(
 security = HTTPBearer()
 
 def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
-    expected_token = os.getenv("API_AUTH_TOKEN", "hackrx-secret-token")
+    expected_token = os.getenv("API_AUTH_TOKEN", "d809808918dd2a7d6b11fa5b23fa01e3abf9814dd225582d4d5674dc2138be0b")
     if credentials.credentials != expected_token:
         raise HTTPException(status_code=401, detail="Invalid or missing token")
     return credentials.credentials
