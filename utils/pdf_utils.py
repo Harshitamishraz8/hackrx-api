@@ -20,22 +20,14 @@ def extract_text_from_pdf(file_path):
     try:
         doc = fitz.open(file_path)
         for page in doc:
-            text += page.get_text()
+            page_text = page.get_text()
+            if not page_text.strip():
+                # Use OCR fallback
+                pix = page.get_pixmap(dpi=300)
+                img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+                page_text = pytesseract.image_to_string(img)
+            text += page_text + "\n"
         doc.close()
-        # Fallback to OCR if extracted text is too small
-        if len(text.strip()) < 50:
-            text = extract_text_with_ocr(file_path)
     except Exception as e:
-        print(f"Error during PDF text extraction: {e}")
-        text = extract_text_with_ocr(file_path)
-    return text
-
-def extract_text_with_ocr(file_path):
-    print("Falling back to OCR...")
-    text = ""
-    doc = fitz.open(file_path)
-    for i, page in enumerate(doc):
-        pix = page.get_pixmap(dpi=300)
-        img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
-        text += pytesseract.image_to_string(img)
+        print(f"Text extraction failed: {e}")
     return text
