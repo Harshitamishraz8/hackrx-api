@@ -1,8 +1,9 @@
 # app/ingest.py
+
 import os
 import tempfile
 import requests
-from PyPDF2 import PdfReader
+from pdfminer.high_level import extract_text
 from sentence_transformers import SentenceTransformer
 from app.utils import upsert_to_pinecone
 from dotenv import load_dotenv
@@ -26,38 +27,33 @@ def process_and_store_pdf(pdf_url: str):
         tmp_path = tmp.name
 
     try:
-        reader = PdfReader(tmp_path)
-        all_text = ""
+        # ✅ Extract text using pdfminer (better than PyPDF2)
+        all_text = extract_text(tmp_path)
         
-        for page_num, page in enumerate(reader.pages):
-            try:
-                page_text = page.extract_text()
-                if page_text:
-                    all_text += f"\n--- Page {page_num + 1} ---\n{page_text}"
-            except Exception as e:
-                print(f"Error extracting text from page {page_num + 1}: {e}")
-                continue
-        
-        if not all_text.strip():
+        if not all_text or not all_text.strip():
             raise ValueError("No text could be extracted from the PDF")
-        
+
         print(f"Extracted {len(all_text)} characters from PDF")
-        
-        # Create overlapping chunks for better context
+        print("Sample Extracted Text:\n", all_text[:1000])  # Debug: first 1000 chars
+
+        # ✅ Split text into overlapping chunks
         chunk_size = 800
         overlap = 200
         chunks = []
-        
+
         for i in range(0, len(all_text), chunk_size - overlap):
-            chunk = all_text[i:i + chunk_size]
-            if chunk.strip():
-                chunks.append(chunk.strip())
-        
+            chunk = all_text[i:i + chunk_size].strip()
+            if chunk:
+                chunks.append(chunk)
+
+        if not chunks:
+            raise ValueError("No meaningful chunks were created")
+
         print(f"Created {len(chunks)} chunks")
-        
-        # Create unique document ID based on URL
+
+        # ✅ Generate doc ID from URL hash
         doc_id = hashlib.md5(pdf_url.encode()).hexdigest()[:8]
-        
+
         vectors = []
         for i, chunk in enumerate(chunks):
             try:
@@ -75,20 +71,18 @@ def process_and_store_pdf(pdf_url: str):
             except Exception as e:
                 print(f"Error creating embedding for chunk {i}: {e}")
                 continue
-        
+
         if vectors:
             upsert_to_pinecone(vectors)
-            print(f"Successfully stored {len(vectors)} vectors in Pinecone")
+            print(f"✅ Stored {len(vectors)} vectors in Pinecone")
         else:
             raise ValueError("No vectors were created from the document")
-            
+
     except Exception as e:
         print(f"Error processing PDF: {e}")
         raise
     finally:
-        # Clean up temporary file
         try:
             os.unlink(tmp_path)
         except:
             pass
-
