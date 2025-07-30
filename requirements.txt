@@ -1,5 +1,13 @@
 fastapi
 uvicorn
+python-multipart
+pydantic
 httpx
+PyMuPDF
+python-docx
 pinecone
+sentence-transformers
 python-dotenv
+requests
+groq
+PyPDF2
