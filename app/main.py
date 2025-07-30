@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.qa import get_answer
 from app.ingest import process_and_store_pdf
 from app.models import QARequest
+import os
 
 app = FastAPI(
     title="HackRx Document Q&A API",
@@ -23,12 +24,22 @@ app.add_middleware(
 security = HTTPBearer()
 
 def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
-    if credentials.credentials != "hackrx-secret-token":
+    expected_token = os.getenv("API_AUTH_TOKEN", "hackrx-secret-token")
+    if credentials.credentials != expected_token:
         raise HTTPException(status_code=401, detail="Invalid or missing token")
     return credentials.credentials
 
 @app.post("/hackrx/run", tags=["Run Qa"])
 async def run_qa(request: QARequest, token: str = Depends(verify_token)):
-    process_and_store_pdf(request.documents)
-    answers = get_answer(request.questions, request.documents)
-    return answers
+    try:
+        # Process the document and get answers
+        answers = get_answer(request.questions, request.documents)
+        
+        # Return in the exact format expected by the platform
+        return {"answers": [item["answer"] for item in answers]}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error processing request: {str(e)}")
+
+@app.get("/", tags=["Health Check"])
+async def health_check():
+    return {"status": "API is running", "message": "HackRx Document Q&A API"}
